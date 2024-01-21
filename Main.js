@@ -16,42 +16,47 @@ const getTimeDifference = (startTime, endTime) => {
     return endMinutes - startMinutes;
 };
 
+// Sets to keep track of unique employees for each analysis
+const employeesFor7ConsecutiveDays = new Set();
+const employeesForLessThan10HoursBetweenShifts = new Set();
+const employeesForMoreThan14HoursInSingleShift = new Set();
+
 // Read the CSV file and analyze the data
 fs.createReadStream(filePath)
     .pipe(csv())
     .on('data', (row) => {
-        // Perform analysis for 7 consecutive days
-        // Assuming 'Pay Cycle End Date' is in 'MM/DD/YYYY' format
-        const currentDate = new Date(row['Pay Cycle End Date']);
-        currentDate.setDate(currentDate.getDate() + 1); // Increment by one to consider the current date
+        const employeeName = row['Employee Name'];
+        const positionID = row['Position ID'];
 
+        // Perform analysis for 7 consecutive days
+        const currentDate = new Date(row['Pay Cycle End Date']);
+        currentDate.setDate(currentDate.getDate() + 1);
         const last7Days = new Date(currentDate);
         last7Days.setDate(currentDate.getDate() - 6);
-
         const rowDate = new Date(row['Pay Cycle End Date']);
 
         if (rowDate >= last7Days && rowDate <= currentDate) {
-            console.log(`Employee worked for 7 consecutive days - Employee: ${row['Employee Name']}, Position: ${row['Position ID']}`);
+            employeesFor7ConsecutiveDays.add(`${employeeName}-${positionID}`);
         }
 
-        // Perform analysis for less than 10 hours between shifts but greater than 1 hour
-        // Assuming 'Time Out' and 'Time' are in 'MM/DD/YYYY hh:mm A' format
+        // Perform analysis for less than 10 hours between shifts
         const timeOut = new Date(row['Time Out']);
         const timeIn = new Date(row['Time']);
-
         const timeDifference = getTimeDifference(timeIn.toLocaleTimeString(), timeOut.toLocaleTimeString());
 
         if (timeDifference > 60 && timeDifference < 600) {
-            console.log(`Employee has less than 10 hours between shifts but greater than 1 hour - Employee: ${row['Employee Name']}, Position: ${row['Position ID']}`);
+            employeesForLessThan10HoursBetweenShifts.add(`${employeeName}-${positionID}`);
         }
 
         // Perform analysis for more than 14 hours in a single shift
         const shiftDuration = parseTimeToMinutes(row['Timecard Hours (as Time)']);
-
         if (shiftDuration > 840) {
-            console.log(`Employee worked for more than 14 hours in a single shift - Employee: ${row['Employee Name']}, Position: ${row['Position ID']}`);
+            employeesForMoreThan14HoursInSingleShift.add(`${employeeName}-${positionID}`);
         }
     })
     .on('end', () => {
         // Analysis completed
+        console.log('Employees who worked for 7 consecutive days:', [...employeesFor7ConsecutiveDays]);
+        console.log('Employees with less than 10 hours between shifts:', [...employeesForLessThan10HoursBetweenShifts]);
+        console.log('Employees who worked for more than 14 hours in a single shift:', [...employeesForMoreThan14HoursInSingleShift]);
     });
